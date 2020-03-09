@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+  <script type="text/javascript" src="./js/react.development.js"></script>
+  <script type="text/javascript" src="./js/react-dom.development.js"></script>
+  <script type="text/javascript" src="./js/babel.min.js"></script>
+
+  <title>setState()异步和同步</title>
+</head>
+<body>
+  <div id="example"></div>
+
+  <script type="text/babel">
+
+    /**
+      setState()更新状态是异步还是同步的?--->可能异步，也可能同步
+          1). 执行setState()的位置?
+              在react控制的回调函数中: 生命周期勾子 / react事件监听回调 （异步）
+              非react控制的异步回调函数中: 定时器回调 / 原生事件监听回调 / promise回调 /... (同步)
+          2). 异步 OR 同步?
+              react相关回调中: 异步
+              其它异步回调中: 同步
+
+       关于异步的setState()
+          1). 多次调用, 如何处理?
+              setState({}): 合并更新一次状态, 只调用一次render()更新界面 ---状态更新和界面更新都合并了
+              setState(fn): 更新多次状态, 但只调用一次render()更新界面  ---状态更新没有合并, 但界面更新合并了
+          2). 如何得到异步更新后的状态数据?
+              在setState()的callback回调函数中
+
+       */
+
+    class StateAsync extends React.Component{
+      state={
+        count:0
+      };
+
+      //1.react事件监听回调函数中，setState是异步的，在渲染之后更新
+      update1=()=>{
+        console.log('update1 setState(state=>({count:state.count+2})) 之前：',this.state.count);
+        this.setState(state=>({count:state.count+2}))
+        console.log('update1 setState(state=>({count:state.count+2})) 之后：',this.state.count);
+      };
+
+      //2.DidMount在第一次render之后调用，react生命周期钩子中，setState属于异步更新状态
+      componentDidMount(){
+        console.log('componentDidMount setState(state=>({count:state.count+2})) 之前：',this.state.count);
+        this.setState(state=>({count:state.count+2}))
+        console.log('componentDidMount setState(state=>({count:state.count+2})) 之后：',this.state.count);
+      };
+
+      //3.同步状态：定时器回调
+      update2=()=>{
+        setTimeout(()=>{
+          console.log('setTimeout(()=>{ setState(state=>({count:state.count+2})) }之前：',this.state.count);
+          this.setState(state=>({count:state.count+3}))
+          console.log('setTimeout(()=>{ setState(state=>({count:state.count+2})) } 之后：',this.state.count);
+        });
+      };
+
+      //4.同步状态：原生事件监听回调
+      update3=()=>{
+        const h2=this.refs.count;
+        //绑定原生dom事件监听
+        h2.onclick=()=>{
+          console.log(' h2.onClick=()=>{ setState(state=>({count:state.count+3})) }之前：',this.state.count);
+          this.setState(state=>({count:state.count+3}))
+          console.log(' h2.onClick=()=>{ setState(state=>({count:state.count+3})) }之后：',this.state.count);
+        }
+      };
+
+      //5.同步状态：promise回调,在await中执行，相当于在then之后执行，为同步回调函数
+      update4=()=>{
+
+        Promise.resolve().then(value=>{
+
+          setTimeout(()=>{
+            console.log('Promise.resolve().then(value=>{ setState(state=>({count:state.count+4})) }之前：',this.state.count);
+            this.setState(state=>({count:state.count+4}))
+            console.log('Promise.resolve().then(value=>{ setState(state=>({count:state.count+4})) } 之后：',this.state.count);
+          });
+        })
+
+      };
+
+      //6.函数模式
+      update5=()=>{
+
+        console.log('render()1之前：',this.state.count);
+        this.setState(state=>({count:state.count+4}))
+        console.log('render()1之后：',this.state.count);
+        //之前的状态被统一处理,render一次
+        console.log('render()2之前：',this.state.count);
+        this.setState(state=>({count:state.count+5}))
+        console.log('render()2之后：',this.state.count);
+
+      };
+
+      //7.对象模式
+      update6=()=>{
+
+        console.log('render()3之前：',this.state.count);
+        this.setState({count:this.state.count+1})
+        console.log('render()3之后：',this.state.count);
+        //之前的状态被合并,render()4次更新状态
+        console.log('render()4之前：',this.state.count);
+        this.setState({count:this.state.count+2})
+        console.log('render()4之后：',this.state.count);
+
+      };
+
+      //8.先对象后函数
+      update7=()=>{
+
+        console.log('render()3-对象 之前：',this.state.count);
+        this.setState({count:this.state.count+1})
+        console.log('render()3-对象 之后：',this.state.count);
+        //之前的状态被合并,render()4次没有更新状态
+        console.log('render()4-函数 之前：',this.state.count);
+        this.setState(state=>({count:state.count+2}))
+        console.log('render()4-函数 之后：',this.state.count);
+
+      };
+
+      render(){
+        const {count}=this.state;
+        console.log('serState Async render() ',count);
+
+        return (
+          <div>
+            <h2 ref='count'>{count}</h2>
+            <button onClick={this.update1}>更新1</button>&nbsp;&nbsp;
+            <button onClick={this.update2}>更新2</button>&nbsp;&nbsp;
+            <button onClick={this.update3}>更新3</button>&nbsp;&nbsp;
+            <button onClick={this.update4}>更新4</button>&nbsp;&nbsp;
+            <button onClick={this.update5}>更新5</button>&nbsp;&nbsp;
+            <button onClick={this.update6}>更新6</button>&nbsp;&nbsp;
+            <button onClick={this.update7}>更新7</button>&nbsp;&nbsp;
+          </div>
+        );
+      }
+    }
+
+    ReactDOM.render(<StateAsync/>,document.getElementById('example'));
+
+  </script>
+</body>
+</html>
